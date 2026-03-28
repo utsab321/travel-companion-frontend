@@ -65,6 +65,8 @@ function Register() {
         Already have an account? <a href="/">Login</a>
       </p>
     </div>
+
+    
   );
 }
 

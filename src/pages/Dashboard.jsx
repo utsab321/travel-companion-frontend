@@ -1,102 +1,95 @@
-import React, { useEffect, useState } from "react";
-  //  import { Card, CardContent } from "../components/ui/card";
-// import { Button } from "/components/ui/button";
-// import { Input } from "@/components/ui/input";
-// import { motion } from "framer-motion";
+import { useEffect, useState } from "react";
+import api from "../API/api";
+import StatCard from "../components/Dashboard/StatCard";
+import ListCard from "../components/Dashboard/ListCard";
+import ExpenseCard from "../components/Dashboard/ExpenseCard";
+import Charts from "../components/Dashboard/Charts";
+import KYCVerified from "../components/KYCVerified";
+import { useNavigate } from "react-router-dom";
 
-const API_BASE = "http://127.0.0.1:8000/api/trips"; // Django backend
+
+
+
+
 
 export default function Dashboard() {
+  const navigate = useNavigate();
   const [trips, setTrips] = useState([]);
   const [destinations, setDestinations] = useState([]);
   const [expenses, setExpenses] = useState([]);
+  const [user, setUser] = useState(null);
 
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-  const fetchData = async () => {
+  const fetchUser = async () => {
     try {
-      const [tripRes, destRes, expRes] = await Promise.all([
-        fetch(`${API_BASE}/trips/`),
-        fetch(`${API_BASE}/destinations/`),
-        fetch(`${API_BASE}/expenses/`),
+      const res = await api.get("/users/me/");
+      setUser(res.data);
+    } catch (err) {
+      console.error("Error fetching user:", err);
+    }
+  };
+
+
+
+ 
+
+  const fetchDashboardData = async () => {
+    try {
+      const [tripsRes, destRes, expRes] = await Promise.all([
+        api.get("/trips/"),
+        api.get("/destinations/"),
+        api.get("/expenses/"),
       ]);
-
-      const tripsData = await tripRes.json();
-      const destData = await destRes.json();
-      const expData = await expRes.json();
-
-      setTrips(tripsData);
-      setDestinations(destData);
-      setExpenses(expData);
+      setTrips(tripsRes.data);
+      setDestinations(destRes.data);
+      setExpenses(expRes.data);
     } catch (err) {
       console.error("Error fetching data:", err);
     }
   };
+useEffect(() => {
+    fetchUser();
+    fetchDashboardData();
+} ,[]);
 
+ const kycStatus = localStorage.getItem("kyc_status");
+
+    if (kycStatus !== "verified") {
   return (
-    <div className="p-6 grid gap-6">
+    <div className="p-4 bg-yellow-100 rounded">
+      ⚠️ Your KYC is {kycStatus}
+      <br />
+      <button onClick={() => navigate("/kyc")}>
+        Complete KYC
+      </button>
+    </div>
+  );} 
+  return (
+    <div className="p-6 space-y-6">
+      <KYCVerified user={user} />
       <h1 className="text-3xl font-bold">Travel Dashboard</h1>
 
+      {/* Stats Cards */}
       <div className="grid md:grid-cols-3 gap-6">
         <StatCard title="Trips" value={trips.length} />
         <StatCard title="Destinations" value={destinations.length} />
         <StatCard title="Expenses" value={expenses.length} />
       </div>
 
+      {/* Charts */}
+      <Charts trips={trips} expenses={expenses} />
+
+      {/* Lists */}
       <div className="grid md:grid-cols-2 gap-6">
         <ListCard title="Trips" data={trips} field="name" />
         <ListCard title="Destinations" data={destinations} field="name" />
       </div>
 
+      {/* Expenses */}
       <ExpenseCard expenses={expenses} />
     </div>
-  );
-}
 
-function StatCard({ title, value }) {
-  return (
-    <div className="p-4 border rounded-xl shadow">
-      <h2 className="text-lg font-semibold">{title}</h2>
-      <p className="text-2xl">{value}</p>
-    </div>
   );
-}
+  
 
-function ListCard({ title, data, field }) {
-  return (
-    <div className="rounded-2xl shadow">
-      <div className="p-4">
-        <h2 className="text-xl font-semibold mb-3">{title}</h2>
-        <ul className="space-y-2">
-          {data.map((item, index) => (
-            <li key={index} className="border p-2 rounded">
-              {item[field]}
-            </li>
-          ))}
-        </ul>
-      </div>
-    </div>
-  );
-}
 
-function ExpenseCard({ expenses }) {
-  const total = expenses.reduce((sum, e) => sum + Number(e.amount || 0), 0);
-
-  return (
-    <div className="rounded-2xl shadow">
-      <div className="p-4">
-        <h2 className="text-xl font-semibold mb-3">Expenses</h2>
-        <p className="mb-2">Total: {total}</p>
-        <ul className="space-y-2">
-          {expenses.map((exp, i) => (
-            <li key={i} className="border p-2 rounded">
-              {exp.title} - {exp.amount}
-            </li>
-          ))}
-        </ul>
-      </div>
-    </div>
-  );
 }

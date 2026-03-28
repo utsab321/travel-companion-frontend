@@ -8,77 +8,101 @@ function Login() {
     password: "",
   });
 
-  const [errors, setErrors] = useState({
-    username: "",
-    password: "",
-  });
-
+  const [errors, setErrors] = useState({});
   const [message, setMessage] = useState("");
   const navigate = useNavigate();
 
-  const validateForm = () => {
-    const newErrors = { username: "", password: "" };
-    let isValid = true;
+  const handleChange = (e) => {
+    setForm({
+      ...form,
+      [e.target.name]: e.target.value,
+    });
 
-    if (!form.username.trim()) {
-      newErrors.username = "Username is required";
-      isValid = false;
-    } else if (form.username.trim().length < 3) {
-      newErrors.username = "Username must be at least 3 characters";
-      isValid = false;
-    }
+    setErrors({
+      ...errors,
+      [e.target.name]: "",
+    });
 
-    if (!form.password) {
-      newErrors.password = "Password is required";
-      isValid = false;
-    } else if (form.password.length < 6) {
-      newErrors.password = "Password must be at least 6 characters";
-      isValid = false;
-    }
-
-    setErrors(newErrors);
-    return isValid;
+    setMessage("");
   };
 
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setForm((prev) => ({ ...prev, [name]: value }));
+  const validate = () => {
+    const err = {};
 
-    setErrors((prev) => ({ ...prev, [name]: "" }));
-    setMessage("");
+    if (!form.username) err.username = "Username required";
+    if (!form.password) err.password = "Password required";
+
+    setErrors(err);
+
+    return Object.keys(err).length === 0;
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setMessage("");
 
-    if (!validateForm()) {
-      return;
-    }
+    if (!validate()) return;
 
     try {
       const res = await axios.post(
-        "http://127.0.0.1:8000/users/api/login/",
+        "http://127.0.0.1:8000/api/token/",
         form,
         {
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+          },
         }
       );
 
-      if (res.data.success) {
-        setMessage("Login successful");
+      console.log("LOGIN RESPONSE:", res.data);
+
+      // ===============================
+      // ✅ CASE 1: JWT (SimpleJWT)
+      // ===============================
+      if (res.data.access) {
+        localStorage.setItem("access", res.data.access);
+        localStorage.setItem("refresh", res.data.refresh || "");
         localStorage.setItem("isLoggedIn", "true");
-        localStorage.setItem("username", form.username.trim());
+
+        setMessage("Login successful");
         navigate("/");
-      } else {
-        setMessage(res.data.message || "Login failed");
+        return;
       }
+
+      // ===============================
+      // ✅ CASE 2: Token auth
+      // ===============================
+      if (res.data.token) {
+        localStorage.setItem("access", res.data.token);
+        localStorage.setItem("isLoggedIn", "true");
+
+        setMessage("Login successful");
+        navigate("/");
+        return;
+      }
+
+      // ===============================
+      // ✅ CASE 3: Session login
+      // ===============================
+      if (res.data.success) {
+        localStorage.setItem("isLoggedIn", "true");
+
+        setMessage("Login successful");
+        navigate("/");
+        return;
+      }
+
+      // ===============================
+      // ❌ UNKNOWN RESPONSE
+      // ===============================
+      setMessage("Login failed: Invalid response from server");
     } catch (err) {
-      console.error(err);
+      console.log("LOGIN ERROR:", err);
+
       const errorMsg =
-        err.response?.data?.message ||
         err.response?.data?.detail ||
-        "Server error. Please try again later.";
+        err.response?.data?.message ||
+        "Server error";
+
       setMessage(errorMsg);
     }
   };
@@ -87,108 +111,67 @@ function Login() {
     <div style={styles.container}>
       <h2>Login</h2>
 
-      <form onSubmit={handleSubmit} style={styles.form} noValidate>
-        <div style={styles.field}>
-          <input
-            name="username"
-            placeholder="Username"
-            value={form.username}
-            onChange={handleChange}
-            style={styles.input}
-            autoComplete="username"
-          />
-          {errors.username && (
-            <span style={styles.error}>{errors.username}</span>
-          )}
-        </div>
+      <form onSubmit={handleSubmit} style={styles.form}>
+        <input
+          name="username"
+          placeholder="Username"
+          value={form.username}
+          onChange={handleChange}
+          style={styles.input}
+        />
+        {errors.username && <p style={styles.error}>{errors.username}</p>}
 
-        <div style={styles.field}>
-          <input
-            name="password"
-            type="password"
-            placeholder="Password"
-            value={form.password}
-            onChange={handleChange}
-            style={styles.input}
-            autoComplete="current-password"
-          />
-          {errors.password && (
-            <span style={styles.error}>{errors.password}</span>
-          )}
-        </div>
+        <input
+          name="password"
+          type="password"
+          placeholder="Password"
+          value={form.password}
+          onChange={handleChange}
+          style={styles.input}
+        />
+        {errors.password && <p style={styles.error}>{errors.password}</p>}
 
         <button type="submit" style={styles.button}>
           Login
         </button>
       </form>
 
-      {message && (
-        <p style={message.includes("successful") ? styles.success : styles.error}>
-          {message}
-        </p>
-      )}
-
-      <p style={styles.link}>
-        Don't have an account? <a href="/register">Register</a>
-      </p>
+      {message && <p style={styles.message}>{message}</p>}
     </div>
   );
 }
 
 const styles = {
   container: {
-    width: "320px",
+    width: "300px",
     margin: "80px auto",
-    padding: "2rem 1.5rem",
     textAlign: "center",
   },
-
   form: {
     display: "flex",
     flexDirection: "column",
-    gap: "1.2rem",
+    gap: "10px",
   },
-
-  field: {
-    textAlign: "left",
-  },
-
   input: {
-    width: "100%",
-    padding: "10px 12px",
-    fontSize: "1rem",
+    padding: "10px",
     border: "1px solid #ccc",
-    borderRadius: "6px",
-    boxSizing: "border-box",
+    borderRadius: "5px",
   },
-
   button: {
-    padding: "12px",
-    fontSize: "1.05rem",
-    background: "#000",
-    color: "#fff",
+    padding: "10px",
+    background: "black",
+    color: "white",
     border: "none",
-    borderRadius: "6px",
     cursor: "pointer",
-    marginTop: "0.5rem",
   },
-
   error: {
-    color: "#d32f2f",
-    fontSize: "0.85rem",
-    marginTop: "4px",
-    display: "block",
+    color: "red",
+    fontSize: "12px",
+    margin: 0,
   },
-
-  success: {
-    color: "#2e7d32",
-    marginTop: "1rem",
-    fontWeight: "500",
-  },
-
-  link: {
-    marginTop: "1.5rem",
-    fontSize: "0.95rem",
+  message: {
+    marginTop: "10px",
+    color: "green",
   },
 };
 
